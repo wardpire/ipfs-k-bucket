@@ -19,10 +19,10 @@ namespace Makaretu.Collections
     ///   All public methods and properties are thead-safe.
     /// </remarks>
     public class KBucket<T> : ICollection<T>
-        where T: class, IContact
+        where T : class, IContact
     {
-        readonly ReaderWriterLockSlim rwlock = new ReaderWriterLockSlim();
-        byte[] localContactId;
+        private readonly ReaderWriterLockSlim rwlock = new();
+        private byte[] localContactId;
 
         /// <summary>
         ///   The number of contacts allowed in a bucket.
@@ -48,7 +48,8 @@ namespace Makaretu.Collections
         /// <value>
         ///   Defaults to 20 random bytes.
         /// </value>
-        public byte[] LocalContactId {
+        public byte[] LocalContactId
+        {
             get
             {
                 if (localContactId == null)
@@ -67,7 +68,7 @@ namespace Makaretu.Collections
         /// <summary>
         ///   The root of the binary tree.
         /// </summary>
-        public Bucket<T> Root { get; private set; } = new Bucket<T>();
+        public Bucket<T> Root { get; private set; } = new();
 
         /// <summary>
         ///   Raised when a bucket needs splitting but cannot be split.
@@ -98,7 +99,7 @@ namespace Makaretu.Collections
         /// <returns>
         ///   Always returns the <paramref name="incumbent"/>.
         /// </returns>
-        public static T DefaultAbiter (T incumbent, T candidate)
+        public static T DefaultAbiter(T incumbent, T candidate)
         {
             return incumbent;
         }
@@ -124,11 +125,11 @@ namespace Makaretu.Collections
             var max = Math.Max(a.Length, b.Length);
             for (; i < min; ++i)
             {
-                distance = distance * 256 + (a[i] ^ b[i]);
+                distance = (distance * 256) + (a[i] ^ b[i]);
             }
             for (; i < max; ++i)
             {
-                distance = distance * 256 + 255;
+                distance = (distance * 256) + 255;
             }
             return distance;
         }
@@ -138,7 +139,7 @@ namespace Makaretu.Collections
         /// </summary>
         /// <param name="contact"></param>
         /// <returns>
-        ///   An ordered sequence of contact, sorted by closeness. 
+        ///   An ordered sequence of contact, sorted by closeness.
         /// </returns>
         /// <remarks>
         ///   "Closest" is the XOR metric of the contact.
@@ -156,13 +157,13 @@ namespace Makaretu.Collections
         ///   The unique <see cref="IContact.Id"/> of a contact.
         /// </param>
         /// <returns>
-        ///   An ordered sequence of contact, sorted by closeness. 
+        ///   An ordered sequence of contact, sorted by closeness.
         /// </returns>
         /// <remarks>
         ///   "Closest" is the XOR metric of the contact.
         /// </remarks>
         public IEnumerable<T> Closest(byte[] id)
-        { 
+        {
             return this
                 .Select(c => new { distance = Distance(c.Id, id), contact = c })
                 .OrderBy(a => a.distance)
@@ -227,7 +228,7 @@ namespace Makaretu.Collections
         ///   The ID of an <see cref="IContact"/>.
         /// </param>
         /// <param name="contact">
-        ///   When this method returns, contains the <see cref="IContact"/> associated 
+        ///   When this method returns, contains the <see cref="IContact"/> associated
         ///   with the <paramref name="id"/>, if the key is found; otherwise, <b>null</b>.
         ///   This parameter is passed uninitialized.
         /// </param>
@@ -239,7 +240,7 @@ namespace Makaretu.Collections
             rwlock.EnterReadLock();
             try
             {
-                contact =_Get(id);
+                contact = _Get(id);
                 return contact != null;
             }
             finally
@@ -306,10 +307,10 @@ namespace Makaretu.Collections
         ///   When <paramref name="contact"/> is null or its <see cref="IContact.Id"/>
         ///   is null or empty.
         /// </exception>
-        void Validate(T contact)
+        private void Validate(T contact)
         {
             if (contact == null)
-                throw new ArgumentNullException("contact");
+                throw new ArgumentNullException(nameof(contact));
             if (contact.Id == null || contact.Id.Length == 0)
                 throw new ArgumentNullException("contact.Id");
         }
@@ -320,10 +321,10 @@ namespace Makaretu.Collections
         /// <param name="contact"></param>
         /// <param name="ping"></param>
         /// <returns>
-        ///   <b>true</b> if the <paramref name="contact"/> was added; otherwise, 
+        ///   <b>true</b> if the <paramref name="contact"/> was added; otherwise,
         ///   <b>false</b> and a <see cref="Ping"/> event should be raised.
         /// </returns>
-        bool _Add(T contact, out PingEventArgs<T> ping)
+        private bool _Add(T contact, out PingEventArgs<T> ping)
         {
             ping = null;
 
@@ -343,7 +344,7 @@ namespace Makaretu.Collections
             if (0 <= index)
             {
                 _Update(node, index, contact);
-                return  true;
+                return true;
             }
 
             if (node.Contacts.Count < ContactsPerBucket)
@@ -378,7 +379,7 @@ namespace Makaretu.Collections
         ///   node that was split as an inner node of the binary tree of nodes by
         ///   setting this.root.contacts = null
         /// </summary>
-        void _Split(Bucket<T> node, int bitIndex)
+        private void _Split(Bucket<T> node, int bitIndex)
         {
             node.Left = new Bucket<T>();
             node.Right = new Bucket<T>();
@@ -404,17 +405,21 @@ namespace Makaretu.Collections
         ///   Updates the contact selected by the arbiter.
         /// </summary>
         /// <remarks>
+        /// <para>
         ///   If the selection is our old contact and the candidate is some new contact
         ///   then the new contact is abandoned (not added).
-        ///
+        /// </para>
+        /// <para>
         ///   If the selection is our old contact and the candidate is our old contact
         ///   then we are refreshing the contact and it is marked as most recently
         ///   contacted(by being moved to the right/end of the bucket array).
-        ///   
+        /// </para>
+        /// <para>
         ///   If the selection is our new contact, the old contact is removed and the new
         ///   contact is marked as most recently contacted.
+        /// </para>
         /// </remarks>
-        void _Update(Bucket<T> node, int index, T contact)
+        private void _Update(Bucket<T> node, int index, T contact)
         {
             var incumbent = node.Contacts[index];
             var selection = Arbiter(incumbent, contact);
@@ -440,9 +445,8 @@ namespace Makaretu.Collections
         ///   This is an internal method.  It should not be directly called.
         ///   It is only public for unit testing.
         /// </remarks>
-        public Bucket<T> _DetermineNode(Bucket<T> node, byte[]id, int bitIndex)
+        public Bucket<T> _DetermineNode(Bucket<T> node, byte[] id, int bitIndex)
         {
-
             // id's that are too short are put in low bucket (1 byte = 8 bits)
             // (bitIndex >> 3) finds how many bytes the bitIndex describes
             // bitIndex % 8 checks if we have extra bits beyond byte multiples
@@ -474,7 +478,7 @@ namespace Makaretu.Collections
         }
 
         /// <summary>
-        ///   Get a contact by its exact ID. 
+        ///   Get a contact by its exact ID.
         /// </summary>
         /// <param name="id">
         ///   The ID of a <see cref="IContact"/>.
@@ -482,7 +486,7 @@ namespace Makaretu.Collections
         /// <returns>
         ///   <b>null</b> or the found contact.
         /// </returns>
-        T _Get(byte[] id)
+        private T _Get(byte[] id)
         {
             /*
              * If this is a leaf, loop through the bucket contents and return the correct
@@ -499,7 +503,7 @@ namespace Makaretu.Collections
             return node.Get(id);
         }
 
-        bool _Remove(byte[] id)
+        private bool _Remove(byte[] id)
         {
             var bitIndex = 0;
 
@@ -519,6 +523,5 @@ namespace Makaretu.Collections
 
             return false;
         }
-
     }
 }

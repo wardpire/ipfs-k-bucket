@@ -15,7 +15,7 @@ namespace Makaretu.Collections
         ///   Unique identifier of the contact.
         /// </summary>
         /// <value>
-        ///   Typically a hash of a unique identifier. 
+        ///   Typically a hash of a unique identifier.
         /// </value>
         byte[] Id { get; }
     }
