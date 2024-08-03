@@ -10,12 +10,12 @@ namespace Makaretu.Collections
     ///   A binary tree node in the <see cref="KBucket{T}"/>.
     /// </summary>
     public class Bucket<T>
-        where T: class, IContact
+        where T : class, IContact
     {
         /// <summary>
         ///   The contacts in the bucket.
         /// </summary>
-        public List<T> Contacts = new List<T>();
+        public List<T> Contacts = new();
 
         /// <summary>
         ///  Determines if the bucket can be split.
